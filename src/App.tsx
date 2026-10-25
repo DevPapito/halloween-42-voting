@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api, ApiError, bearer } from './api';
 import type { Candidate, Evaluation, EvaluationDraft, RankingRow, VotingStatus } from './types';
@@ -187,7 +187,7 @@ function PublicVote() {
               <label className={`candidate-option ${selectedId === candidate.id ? 'selected' : ''}`} key={candidate.id}>
                 <input type="radio" name="candidate" value={candidate.id} checked={selectedId === candidate.id} onChange={() => setSelectedId(candidate.id)} />
                 <span className="candidate-number">{String(index + 1).padStart(2, '0')}</span>
-                <span className="candidate-copy"><strong>{candidate.costumeName}</strong><small>{candidate.studentName} · @{candidate.intranetLogin}</small></span>
+                <span className="candidate-copy"><strong>{candidate.costumeName}</strong><small>{candidate.studentName}</small></span>
                 <span className="radio-indicator" aria-hidden="true" />
               </label>
             ))}
@@ -211,7 +211,11 @@ function JudgeEvaluation() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [completed, setCompleted] = useState(false);
+  const [swapDirection, setSwapDirection] = useState<'forward' | 'backward'>('forward');
+  const [swapPhase, setSwapPhase] = useState<'idle' | 'out' | 'in'>('idle');
+  const swapTimer = useRef<ReturnType<typeof window.setTimeout> | undefined>(undefined);
 
   async function startSession(event?: FormEvent) {
     event?.preventDefault();
@@ -259,11 +263,72 @@ function JudgeEvaluation() {
     return () => { active = false; };
   }, [token]);
 
-  function updateDraft(key: keyof EvaluationDraft, value: string | number) {
-    setDrafts((currentDrafts) => currentDrafts.map((draft, index) => index === current ? { ...draft, [key]: value } : draft));
+  useEffect(() => () => window.clearTimeout(swapTimer.current), []);
+
+  function navigateTo(index: number) {
+    if (index === current || swapPhase !== 'idle' || index < 0 || index >= candidates.length) return;
+    setSwapDirection(index > current ? 'forward' : 'backward');
+    setSwapPhase('out');
+    swapTimer.current = window.setTimeout(() => {
+      setCurrent(index);
+      setSwapPhase('in');
+      swapTimer.current = window.setTimeout(() => setSwapPhase('idle'), 220);
+    }, 120);
+  }
+
+  function updateDraft(key: keyof EvaluationDraft, value: string) {
+    const draft = drafts[current];
+    if (!draft) return;
+    const parsedValue = key === 'notes'
+      ? value
+      : value.trim() === ''
+        ? Number.NaN
+        : Number(value);
+    setDrafts((currentDrafts) => currentDrafts.map((item) =>
+      item.candidateId === draft.candidateId ? { ...item, [key]: parsedValue } : item,
+    ));
+
+    if (key !== 'notes') {
+      const field = scoreFields.find((item) => item.key === key);
+      const numberValue = typeof parsedValue === 'number' ? parsedValue : Number.NaN;
+      const message = !Number.isFinite(numberValue)
+        ? 'Informe uma nota válida.'
+        : numberValue < 0 || numberValue > (field?.max ?? 0)
+          ? `A nota deve ficar entre 0 e ${field?.max}.`
+          : '';
+      const errorKey = `${draft.candidateId}:${key}`;
+      setFieldErrors((currentErrors) => {
+        const nextErrors = { ...currentErrors };
+        if (message) nextErrors[errorKey] = message;
+        else delete nextErrors[errorKey];
+        return nextErrors;
+      });
+    }
   }
 
   async function finalize() {
+    const nextFieldErrors: Record<string, string> = {};
+    let firstInvalidCandidate = -1;
+    for (const [candidateIndex, candidateDraft] of drafts.entries()) {
+      for (const field of scoreFields) {
+        const value = candidateDraft[field.key];
+        const message = !Number.isFinite(value)
+          ? 'Informe uma nota válida.'
+          : value < 0 || value > field.max
+            ? `A nota deve ficar entre 0 e ${field.max}.`
+            : '';
+        if (message) {
+          nextFieldErrors[`${candidateDraft.candidateId}:${field.key}`] = message;
+          if (firstInvalidCandidate < 0) firstInvalidCandidate = candidateIndex;
+        }
+      }
+    }
+    setFieldErrors(nextFieldErrors);
+    if (firstInvalidCandidate >= 0) {
+      setError('');
+      navigateTo(firstInvalidCandidate);
+      return;
+    }
     if (!window.confirm('Finalizar a avaliação? Depois do envio, as notas não poderão ser alteradas.')) return;
     setSubmitting(true);
     setError('');
@@ -311,25 +376,43 @@ function JudgeEvaluation() {
         <div><p className="eyebrow">FICHA DO JURADO{judgeName ? ` · ${judgeName.toUpperCase()}` : ''}</p><h1>Avaliação <span>técnica.</span></h1></div>
         <span className="step-counter">{String(current + 1).padStart(2, '0')} <span>/ {String(candidates.length).padStart(2, '0')}</span></span>
       </div>
-      <div className="progress-track"><span style={{ width: `${((current + 1) / candidates.length) * 100}%` }} /></div>
-      <article className="evaluation-card">
-        <div className="candidate-intro"><span className="candidate-number">{String(current + 1).padStart(2, '0')}</span><div><p className="eyebrow">@{candidate.intranetLogin}</p><h2>{candidate.costumeName}</h2><p>{candidate.studentName}</p></div></div>
+      <nav className="candidate-stepper" aria-label="Navegar entre candidatos">
+        {candidates.map((stepCandidate, index) => (
+          <button
+            aria-label={`Ir para candidato ${index + 1}: ${stepCandidate.studentName}`}
+            aria-current={current === index ? 'step' : undefined}
+            className={`candidate-step ${current === index ? 'active' : ''}`}
+            disabled={swapPhase !== 'idle'}
+            key={stepCandidate.id}
+            onClick={() => navigateTo(index)}
+            type="button"
+          >
+            <span>{String(index + 1).padStart(2, '0')}</span>
+            <span className="candidate-step-name">{stepCandidate.studentName}</span>
+          </button>
+        ))}
+      </nav>
+      <article className={`evaluation-card ${swapPhase === 'out' ? `swap-out-${swapDirection}` : ''} ${swapPhase === 'in' ? `swap-in-${swapDirection}` : ''}`}>
+        <div className="candidate-intro"><span className="candidate-number">{String(current + 1).padStart(2, '0')}</span><div><p className="eyebrow">CANDIDATO {String(current + 1).padStart(2, '0')}</p><h2>{candidate.costumeName}</h2><p>{candidate.studentName}</p></div></div>
         <div className="score-list">
           {scoreFields.map(({ key, label, max }) => (
-            <label className="score-row" key={key}>
-              <span>{label}<small>Máximo: {max} pontos</small></span>
-              <span className="score-input"><input type="number" min="0" max={max} step="0.01" value={draft[key]} onChange={(event) => updateDraft(key, Number(event.target.value))} /><small>/{max}</small></span>
-            </label>
+            <div className="score-field" key={key}>
+              <label className="score-row" htmlFor={`score-${candidate.id}-${key}`}>
+                <span>{label}<small>Máximo: {max} pontos</small></span>
+                <span className="score-input"><input id={`score-${candidate.id}-${key}`} aria-invalid={Boolean(fieldErrors[`${candidate.id}:${key}`])} aria-describedby={fieldErrors[`${candidate.id}:${key}`] ? `error-${candidate.id}-${key}` : undefined} className={fieldErrors[`${candidate.id}:${key}`] ? 'invalid' : ''} type="number" min="0" max={max} step="0.01" value={Number.isFinite(draft[key]) ? draft[key] : ''} onChange={(event) => updateDraft(key, event.target.value)} /><small>/{max}</small></span>
+              </label>
+              {fieldErrors[`${candidate.id}:${key}`] && <p className="field-error" id={`error-${candidate.id}-${key}`} role="alert">{fieldErrors[`${candidate.id}:${key}`]}</p>}
+            </div>
           ))}
         </div>
         <label className="notes-field">Observações <span>opcional</span><textarea value={draft.notes} onChange={(event) => updateDraft('notes', event.target.value)} rows={3} placeholder="Anotações sobre a apresentação..." /></label>
       </article>
       {error && <p className="alert" role="alert">{error}</p>}
       <div className="evaluation-actions">
-        <button className="button button-outline" onClick={() => setCurrent((index) => Math.max(index - 1, 0))} disabled={current === 0}>← Anterior</button>
+        <button className="button button-outline" onClick={() => navigateTo(current - 1)} disabled={current === 0 || swapPhase !== 'idle'}>← Anterior</button>
         {current < candidates.length - 1
-          ? <button className="button button-primary" onClick={() => setCurrent((index) => Math.min(index + 1, candidates.length - 1))}>Próximo candidato →</button>
-          : <button className="button button-primary" onClick={finalize} disabled={submitting}>{submitting ? 'Enviando...' : 'Finalizar avaliação'}</button>}
+          ? <button className="button button-primary" onClick={() => navigateTo(current + 1)} disabled={swapPhase !== 'idle'}>Próximo candidato →</button>
+          : <button className="button button-primary" onClick={finalize} disabled={submitting || swapPhase !== 'idle'}>{submitting ? 'Enviando...' : 'Finalizar avaliação'}</button>}
       </div>
       <p className="fine-print">Você pode navegar entre candidatos e revisar suas notas antes de finalizar.</p>
     </section>
@@ -502,7 +585,7 @@ function AdminPanel() {
         </article>
         <article className="admin-card ranking-card">
           <div className="card-heading"><div><p className="eyebrow">ACOMPANHAMENTO</p><h2>Ranking atual</h2></div><button className="button button-outline button-small" onClick={() => void perform(async () => {})}>Atualizar</button></div>
-          {ranking.length === 0 ? <p className="muted">Cadastre candidatos para ver o ranking.</p> : <div className="table-wrap"><table><thead><tr><th>#</th><th>Fantasia</th><th>Júri</th><th>Votos</th><th>Ações</th></tr></thead><tbody>{ranking.map((row, index) => <tr key={row.candidateId}><td className="rank-cell">{String(index + 1).padStart(2, '0')}</td><td><strong>{row.costumeName}</strong><small>{row.studentName} · @{row.intranetLogin}</small></td><td>{row.juryAverage.toFixed(2)}</td><td>{row.publicVotesCount}</td><td className="actions-cell"><button className="icon-button" aria-label={`Editar ${row.costumeName}`} onClick={() => { const candidate = candidates.find((entry) => entry.id === row.candidateId); if (!candidate) return; const studentName = window.prompt('Nome do participante', candidate.studentName); if (studentName === null) return; const costumeName = window.prompt('Nome da fantasia', candidate.costumeName); if (costumeName === null) return; const intranetLogin = window.prompt('Login da Intranet', candidate.intranetLogin); if (intranetLogin === null) return; void perform(() => api(`/api/v1/admin/candidates/${row.candidateId}`, { method: 'PATCH', headers: bearer(adminToken), body: JSON.stringify({ intranetLogin, studentName, costumeName }) })); }}>✎</button><button className="icon-button" aria-label={`Excluir ${row.costumeName}`} onClick={() => { if (window.confirm(`Excluir ${row.costumeName}? Os votos e notas associados também serão removidos.`)) void perform(() => api(`/api/v1/admin/candidates/${row.candidateId}`, { method: 'DELETE', headers: bearer(adminToken) })); }}>×</button></td></tr>)}</tbody></table></div>}
+          {ranking.length === 0 ? <p className="muted">Cadastre candidatos para ver o ranking.</p> : <div className="table-wrap"><table><thead><tr><th>#</th><th>Fantasia</th><th>Júri</th><th>Votos</th><th>Ações</th></tr></thead><tbody>{ranking.map((row, index) => <tr key={row.candidateId}><td className="rank-cell">{String(index + 1).padStart(2, '0')}</td><td><strong>{row.costumeName}</strong><small>{row.studentName}</small></td><td>{row.juryAverage.toFixed(2)}</td><td>{row.publicVotesCount}</td><td className="actions-cell"><button className="icon-button" aria-label={`Editar ${row.costumeName}`} onClick={() => { const candidate = candidates.find((entry) => entry.id === row.candidateId); if (!candidate) return; const studentName = window.prompt('Nome do participante', candidate.studentName); if (studentName === null) return; const costumeName = window.prompt('Nome da fantasia', candidate.costumeName); if (costumeName === null) return; const intranetLogin = window.prompt('Login da Intranet', candidate.intranetLogin); if (intranetLogin === null) return; void perform(() => api(`/api/v1/admin/candidates/${row.candidateId}`, { method: 'PATCH', headers: bearer(adminToken), body: JSON.stringify({ intranetLogin, studentName, costumeName }) })); }}>✎</button><button className="icon-button" aria-label={`Excluir ${row.costumeName}`} onClick={() => { if (window.confirm(`Excluir ${row.costumeName}? Os votos e notas associados também serão removidos.`)) void perform(() => api(`/api/v1/admin/candidates/${row.candidateId}`, { method: 'DELETE', headers: bearer(adminToken) })); }}>×</button></td></tr>)}</tbody></table></div>}
         </article>
         <article className="admin-card">
           <div className="card-heading"><div><p className="eyebrow">EQUIPE</p><h2>Jurados cadastrados</h2></div></div>
