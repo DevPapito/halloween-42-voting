@@ -42,12 +42,10 @@ function BrandHeader() {
     <header className="topbar">
       <a className="brand" href="/" aria-label="Halloween 42sp - início">
         <span className="brand-mark">42</span>
-        <span>HALLOWEEN <strong>VOTING</strong></span>
+        <span>HALLOWEEN <strong>VOTING</strong> <span className="brand-edition">1ª EDITION</span></span>
       </a>
       <nav aria-label="Navegação principal">
-        <a href="/votar">Votar</a>
         <a href="/jurado/avaliar">Jurado</a>
-        <a href="/admin">Admin</a>
       </nav>
     </header>
   );
@@ -81,12 +79,8 @@ function Home() {
     <>
       <section className="hero">
         <p className="eyebrow">42sp · CONCURSO DE FANTASIAS</p>
-        <h1>Uma noite.<br /><span>Uma fantasia lendária.</span></h1>
-        <p className="hero-copy">Acompanhe a votação do Halloween 42sp. Escolha sua fantasia favorita ou entre como jurado para avaliar cada detalhe.</p>
-        <div className="hero-actions">
-          <a className="button button-primary" href="/votar">Votar agora <span aria-hidden="true">↗</span></a>
-          <a className="button button-outline" href="/jurado/avaliar">Área do jurado</a>
-        </div>
+        <h1>Do terminal para o terror.<br /><span>Que comece o Halloween da 42.</span></h1>
+        <p className="hero-copy">Acompanhe a votação da primeira edição do Halloween 42sp. Vote na sua fantasia favorita ou entre como jurado para avaliar cada detalhe.</p>
       </section>
       {showQrCode && (
         <section className="home-qr-section" aria-labelledby="home-qr-title">
@@ -100,16 +94,9 @@ function Home() {
               title="QR Code para votar no concurso Halloween 42sp"
             />
           </div>
-          <p>Escaneie o QR Code para abrir a página de votação.</p>
-          <a className="text-link" href="/votar">{window.location.origin}/votar</a>
         </section>
       )}
       {qrCodeError && <p className="qr-load-error" role="status">O QR Code está temporariamente indisponível.</p>}
-      <section className="feature-grid" aria-label="Áreas do concurso">
-        <a className="feature-card" href="/votar"><span className="feature-icon">✦</span><h2>Voto da plateia</h2><p>Um voto por dispositivo. Sem cadastro, direto ao ponto.</p><span className="text-link">Escolher favorito →</span></a>
-        <a className="feature-card" href="/jurado/avaliar"><span className="feature-icon">◈</span><h2>Avaliação técnica</h2><p>Notas em cinco critérios, com liberdade para revisar antes de enviar.</p><span className="text-link">Acessar avaliação →</span></a>
-        <a className="feature-card" href="/admin"><span className="feature-icon">⌘</span><h2>Painel do evento</h2><p>Gerencie participantes, jurados e acompanhe o resultado.</p><span className="text-link">Abrir painel →</span></a>
-      </section>
     </>
   );
 }
@@ -618,7 +605,7 @@ export function App() {
     <div className="app-shell">
       <BrandHeader />
       <main>{path === '/votar' ? <PublicVote /> : path === '/jurado/avaliar' ? <JudgeEvaluation /> : path === '/admin' ? <AdminPanel /> : <Home />}</main>
-      <footer className="footer"><span>42sp HALLOWEEN VOTING</span><span>FEITO PARA UMA NOITE ASSUSTADORAMENTE BOA.</span></footer>
+      <footer className="footer"><span>42sp HALLOWEEN VOTING <span className="brand-edition">1ª EDITION</span></span><span>FEITO PARA UMA NOITE ASSUSTADORAMENTE BOA.</span></footer>
     </div>
   );
 }

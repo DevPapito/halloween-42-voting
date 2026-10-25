@@ -27,18 +27,18 @@ button { color: inherit; }
 .topbar { min-height: 83px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #292927; }
 .brand { display: inline-flex; gap: 12px; align-items: center; font-family: 'Space Grotesk', sans-serif; font-size: 12px; letter-spacing: .12em; font-weight: 600; }
 .brand strong { color: var(--orange); font-weight: 600; }
+.brand-edition { color: #f4f1ec; }
 .brand-mark { display: grid; place-items: center; width: 31px; height: 31px; border: 1px solid var(--orange); color: var(--orange); font-family: 'DM Mono', monospace; font-size: 13px; }
 .topbar nav { display: flex; gap: 30px; color: #b9b7b3; font-size: 13px; }
 .topbar nav a:hover { color: var(--orange-light); }
 main { flex: 1; }
-.hero { padding: clamp(70px, 11vw, 148px) 0 90px; max-width: 800px; }
+.hero { padding: clamp(32px, 5vw, 64px) 0 48px; text-align: center; }
 .eyebrow { margin: 0 0 17px; color: var(--orange); font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .16em; line-height: 1.6; }
 h1, h2, p { margin-top: 0; }
 h1 { margin-bottom: 19px; font-family: 'Space Grotesk', sans-serif; font-size: clamp(42px, 7.4vw, 80px); font-weight: 500; letter-spacing: -.06em; line-height: .99; }
 h1 span { color: var(--orange); }
-.hero-copy { max-width: 540px; margin: 24px 0 30px; color: #a5a29e; font-size: 15px; line-height: 1.8; }
-.hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
-.home-qr-section { display: flex; flex-direction: column; align-items: center; margin: 0 auto 74px; padding: 34px 24px; border: 1px solid var(--line); background: var(--panel); text-align: center; }
+.hero-copy { max-width: 540px; margin: 24px auto 0; color: #a5a29e; font-size: 15px; line-height: 1.8; }
+.home-qr-section { width: min(100%, 520px); display: flex; flex-direction: column; align-items: center; justify-self: center; margin: 0 auto 74px; padding: 34px 24px; border: 1px solid var(--line); background: var(--panel); text-align: center; }
 .home-qr-section .eyebrow { margin-bottom: 8px; }
 .home-qr-section h2 { margin: 0 0 22px; font-family: 'Space Grotesk', sans-serif; font-size: clamp(20px, 3vw, 27px); font-weight: 500; }
 .home-qr-code { display: grid; place-items: center; width: 252px; height: 252px; padding: 16px; background: #fff; }
@@ -53,14 +53,9 @@ h1 span { color: var(--orange); }
 .button-outline { border-color: #484744; background: transparent; color: #efede8; }
 .button-outline:hover:not(:disabled) { border-color: var(--orange); }
 .button-small { min-height: 36px; padding: 0 12px; font-size: 11px; }
-.feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding-bottom: 90px; }
-.feature-card { min-height: 210px; padding: 23px; border: 1px solid var(--line); background: var(--panel); transition: border-color .2s ease, transform .2s ease; }
-.feature-card:hover { border-color: #765032; transform: translateY(-3px); }
-.feature-icon { color: var(--orange); font-size: 21px; }
-.feature-card h2 { margin: 18px 0 9px; font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 500; }
-.feature-card p { min-height: 42px; margin-bottom: 16px; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .text-link { color: var(--orange-light); font-size: 11px; }
 .footer { display: flex; justify-content: space-between; gap: 20px; padding: 23px 0; border-top: 1px solid #292927; color: #66645f; font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: .12em; }
+.footer .brand-edition { color: inherit; }
 .page-section { padding: 76px 0 90px; }
 .page-section.narrow { max-width: 640px; margin: 0 auto; }
 .page-section > h1 { margin-bottom: 14px; font-size: clamp(40px, 6vw, 59px); }
@@ -178,10 +173,7 @@ td small { margin-top: 4px; color: #85827d; font-size: 9px; }
 
 @media (max-width: 760px) {
   .app-shell { padding: 0 5%; }
-  .feature-grid { grid-template-columns: 1fr; gap: 9px; padding-bottom: 55px; }
-  .feature-card { min-height: auto; }
-  .feature-card p { min-height: 0; }
-  .hero { padding: 78px 0 62px; }
+  .hero { padding: 42px 0 40px; }
   .page-section { padding: 55px 0 65px; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .admin-grid { grid-template-columns: 1fr; }
