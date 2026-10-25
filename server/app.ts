@@ -10,6 +10,7 @@ import {
   SubmitJudgeEvaluationsDto,
   SubmitPublicVoteDto,
   UpdateCandidateDto,
+  UpdateQrCodeVisibilityDto,
   UpdateVotingStatusDto,
 } from './dto.js';
 import { VotingStore } from './store.js';
@@ -83,7 +84,8 @@ app.get('/api/v1/health', (_request, response) => {
 });
 
 app.get('/api/v1/public/state', async (_request, response) => {
-  response.json({ status: await store.getStatus() });
+  const settings = await store.getPublicSettings();
+  response.json({ status: settings.votingStatus, showQrCode: settings.showQrCode });
 });
 
 app.get('/api/v1/public/candidates', async (_request, response) => {
@@ -188,6 +190,12 @@ app.patch('/api/v1/admin/voting-status', requireAdmin, async (request, response)
   const dto = await validateDto(UpdateVotingStatusDto, request.body);
   await store.setStatus(dto.status);
   response.json({ status: await store.getStatus() });
+});
+
+app.patch('/api/v1/admin/qr-code', requireAdmin, async (request, response) => {
+  const dto = await validateDto(UpdateQrCodeVisibilityDto, request.body);
+  await store.setQrCodeVisibility(dto.visible);
+  response.json({ showQrCode: dto.visible });
 });
 
 app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {

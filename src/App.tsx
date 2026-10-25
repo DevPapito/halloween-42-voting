@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { api, ApiError, bearer } from './api';
 import type { Candidate, Evaluation, EvaluationDraft, RankingRow, VotingStatus } from './types';
 
@@ -53,6 +54,29 @@ function BrandHeader() {
 }
 
 function Home() {
+  const [showQrCode, setShowQrCode] = useState(false);
+  const [qrCodeError, setQrCodeError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    async function refreshVisibility() {
+      try {
+        const settings = await api<{ showQrCode: boolean }>('/api/v1/public/state');
+        if (!active) return;
+        setShowQrCode(settings.showQrCode);
+        setQrCodeError('');
+      } catch (error: unknown) {
+        if (active) setQrCodeError(formatError(error));
+      }
+    }
+    void refreshVisibility();
+    const interval = window.setInterval(() => void refreshVisibility(), 10_000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, []);
+
   return (
     <>
       <section className="hero">
@@ -64,6 +88,23 @@ function Home() {
           <a className="button button-outline" href="/jurado/avaliar">Área do jurado</a>
         </div>
       </section>
+      {showQrCode && (
+        <section className="home-qr-section" aria-labelledby="home-qr-title">
+          <p className="eyebrow">VOTAÇÃO DA PLATEIA</p>
+          <h2 id="home-qr-title">Aponte a câmera e vote.</h2>
+          <div className="home-qr-code">
+            <QRCodeSVG
+              value={`${window.location.origin}/votar`}
+              size={220}
+              level="H"
+              title="QR Code para votar no concurso Halloween 42sp"
+            />
+          </div>
+          <p>Escaneie o QR Code para abrir a página de votação.</p>
+          <a className="text-link" href="/votar">{window.location.origin}/votar</a>
+        </section>
+      )}
+      {qrCodeError && <p className="qr-load-error" role="status">O QR Code está temporariamente indisponível.</p>}
       <section className="feature-grid" aria-label="Áreas do concurso">
         <a className="feature-card" href="/votar"><span className="feature-icon">✦</span><h2>Voto da plateia</h2><p>Um voto por dispositivo. Sem cadastro, direto ao ponto.</p><span className="text-link">Escolher favorito →</span></a>
         <a className="feature-card" href="/jurado/avaliar"><span className="feature-icon">◈</span><h2>Avaliação técnica</h2><p>Notas em cinco critérios, com liberdade para revisar antes de enviar.</p><span className="text-link">Acessar avaliação →</span></a>
@@ -305,7 +346,7 @@ function AdminPanel() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [judges, setJudges] = useState<Array<{ id: string; name: string; status: string }>>([]);
   const [ranking, setRanking] = useState<RankingRow[]>([]);
-  const [summary, setSummary] = useState<{ votingStatus: VotingStatus; candidateCount: number; judgeCount: number; completedJudgeCount: number; voteCount: number } | null>(null);
+  const [summary, setSummary] = useState<{ votingStatus: VotingStatus; showQrCode: boolean; candidateCount: number; judgeCount: number; completedJudgeCount: number; voteCount: number } | null>(null);
   const [candidateForm, setCandidateForm] = useState({ intranetLogin: '', studentName: '', costumeName: '' });
   const [judgeName, setJudgeName] = useState('');
   const [newJudgePin, setNewJudgePin] = useState('');
@@ -410,6 +451,14 @@ function AdminPanel() {
     }));
   }
 
+  async function changeQrCodeVisibility(visible: boolean) {
+    await perform(() => api('/api/v1/admin/qr-code', {
+      method: 'PATCH',
+      headers: bearer(adminToken),
+      body: JSON.stringify({ visible }),
+    }));
+  }
+
   if (!adminToken) {
     return <section className="page-section narrow"><p className="eyebrow">ADMINISTRAÇÃO</p><h1>Painel do <span>evento.</span></h1><p className="muted">Entre com o usuário e a senha administrativos.</p>
       <form className="login-form" onSubmit={login}><label htmlFor="admin-username">Usuário</label><input id="admin-username" autoComplete="username" value={credentials.username} onChange={(event) => setCredentials({ ...credentials, username: event.target.value })} required /><label htmlFor="admin-password">Senha</label><input id="admin-password" type="password" autoComplete="current-password" value={credentials.password} onChange={(event) => setCredentials({ ...credentials, password: event.target.value })} required />{error && <p className="alert" role="alert">{error}</p>}<button className="button button-primary full-width" disabled={loading}>{loading ? 'Validando...' : 'Acessar painel'}</button></form>
@@ -431,6 +480,10 @@ function AdminPanel() {
           <div className="card-heading"><div><p className="eyebrow">VOTAÇÃO</p><h2>Controle da sessão</h2></div></div>
           <div className="status-controls">
             {(['NOT_STARTED', 'OPEN', 'CLOSED'] as VotingStatus[]).map((status) => <button key={status} className={`status-button ${summary?.votingStatus === status ? 'active' : ''}`} onClick={() => changeVotingStatus(status)}>{statusLabels[status]}</button>)}
+          </div>
+          <div className="qr-admin-control">
+            <div><strong>QR Code na página inicial</strong><small>{summary?.showQrCode ? 'Visível para todos que acessarem o site.' : 'Oculto da página inicial.'}</small></div>
+            <button className={`status-button ${summary?.showQrCode ? 'active' : ''}`} onClick={() => changeQrCodeVisibility(!summary?.showQrCode)} disabled={!summary}>{summary?.showQrCode ? 'Ocultar QR Code' : 'Mostrar QR Code'}</button>
           </div>
         </article>
         <article className="admin-card">

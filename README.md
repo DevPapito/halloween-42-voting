@@ -10,7 +10,7 @@ Aplicação web para votação da plateia, avaliação dos jurados e administra�
 
 ## Configurar o Supabase
 
-1. No Supabase, abra o **SQL Editor**, execute o conteúdo de [`supabase/migrations/202610250001_initial_schema.sql`](./supabase/migrations/202610250001_initial_schema.sql) e confirme que a migration criou as tabelas e funções.
+1. No Supabase, abra o **SQL Editor** e execute, em ordem, as migrations em `supabase/migrations/`: [`202610250001_initial_schema.sql`](./supabase/migrations/202610250001_initial_schema.sql) e [`202610250002_qr_code_visibility.sql`](./supabase/migrations/202610250002_qr_code_visibility.sql). A segunda adiciona o controle de visibilidade do QR Code.
 2. Em **Project Settings → Database → Connection string**, selecione **Transaction pooler** (porta `6543`) e copie a connection string.
 3. Preencha `.env.local` (ou `.env`) com:
 
@@ -42,6 +42,7 @@ O frontend fica em `http://localhost:5173` e a API em `http://localhost:3001`. O
 - `/votar`: voto anônimo por dispositivo, liberado somente com a sessão aberta. O token é guardado no `localStorage` e a unicidade é garantida no banco.
 - `/jurado/avaliar`: acesso por PIN. O jurado pode navegar e revisar notas; ao finalizar, toda a ficha é gravada atomicamente e bloqueada.
 - `/admin`: CRUD de candidatos, gestão de PINs, controle da sessão e ranking com desempates. O ranking atualiza a cada 10 segundos.
+- Na página inicial, o QR Code para `/votar` aparece somente quando o admin ativa **Mostrar QR Code** no painel. O endereço é montado com o domínio atual, então no site publicado leva diretamente para a votação da Vercel.
 
 ## Publicação na Vercel
 

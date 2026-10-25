@@ -1,6 +1,7 @@
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsIn,
   MaxLength,
   IsNotEmpty,
@@ -104,4 +105,9 @@ export class UpdateCandidateDto extends CreateCandidateDto {}
 export class UpdateVotingStatusDto {
   @IsIn(['NOT_STARTED', 'OPEN', 'CLOSED'])
   status!: VotingStatus;
+}
+
+export class UpdateQrCodeVisibilityDto {
+  @IsBoolean()
+  visible!: boolean;
 }
