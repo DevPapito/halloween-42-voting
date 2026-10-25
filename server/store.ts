@@ -18,9 +18,9 @@ if (!databaseUrl) {
 
 const pool = new Pool({
   connectionString: databaseUrl,
-  max: 5,
+  max: 1,
   connectionTimeoutMillis: 5_000,
-  ssl: { rejectUnauthorized: true },
+  ssl: { rejectUnauthorized: false },
 });
 
 interface CandidateRow extends QueryResultRow {

@@ -24,6 +24,8 @@ PORT=3001
 
 Substitua a connection string de exemplo pelos dados reais do seu projeto. Gere um segredo de sessão com, por exemplo, `openssl rand -base64 32`. O servidor conecta diretamente ao PostgreSQL; não precisa de `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL` ou `NEXT_PUBLIC_SUPABASE_ANON_KEY`. A chave `anon` e a URL pública são necessárias quando o navegador usa o SDK Supabase diretamente, o que esta aplicação não faz.
 
+Para a função serverless da Vercel, o pool local do `pg` fica limitado a uma conexão. O cliente força TLS, mas aceita a cadeia de certificado do pooler sem validá-la (`rejectUnauthorized: false`), necessário para contornar a cadeia autoassinada reportada pelo pooler. O tráfego segue criptografado; para também validar a identidade do servidor, configure o certificado CA do Supabase no cliente Postgres antes de usar em ambientes que exijam verificação estrita do certificado.
+
 > **Segurança:** nunca inclua `DATABASE_URL`, `ADMIN_PASSWORD` ou `SESSION_SECRET` em variáveis `VITE_*`, no frontend, em commits ou em repositórios públicos. A API exige usuário e senha do painel e emite um token de sessão HMAC com validade de 12 horas. As operações críticas de voto e finalização são funções SQL transacionais.
 
 ## Executar localmente
