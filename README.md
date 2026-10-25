@@ -10,7 +10,7 @@ Aplicação web para votação da plateia, avaliação dos jurados e administra�
 
 ## Configurar o Supabase
 
-1. No Supabase, abra o **SQL Editor** e execute, em ordem, as migrations em `supabase/migrations/`: [`202610250001_initial_schema.sql`](./supabase/migrations/202610250001_initial_schema.sql) e [`202610250002_qr_code_visibility.sql`](./supabase/migrations/202610250002_qr_code_visibility.sql). A segunda adiciona o controle de visibilidade do QR Code.
+1. No Supabase, abra o **SQL Editor** e execute, em ordem, as migrations em `supabase/migrations/`: [`202610250001_initial_schema.sql`](./supabase/migrations/202610250001_initial_schema.sql), [`202610250002_qr_code_visibility.sql`](./supabase/migrations/202610250002_qr_code_visibility.sql) e [`202610250003_encrypted_judge_pins.sql`](./supabase/migrations/202610250003_encrypted_judge_pins.sql). Elas criam o esquema, o controle de visibilidade do QR Code e o armazenamento criptografado dos PINs.
 2. Em **Project Settings → Database → Connection string**, selecione **Transaction pooler** (porta `6543`) e copie a connection string.
 3. Preencha `.env.local` (ou `.env`) com:
 
@@ -50,7 +50,7 @@ O frontend fica em `http://localhost:5173` e a API em `http://localhost:3001`. O
 2. Em **Project Settings → Environment Variables**, configure `DATABASE_URL`, `ADMIN_USERNAME`, `ADMIN_PASSWORD` e `SESSION_SECRET` para os ambientes necessários (Production/Preview/Development). `PORT` não é necessário na Vercel.
 3. Faça o deploy. [`vercel.json`](./vercel.json) encaminha `/api/*` à função serverless [`api/index.ts`](./api/index.ts) e as demais rotas ao React SPA.
 
-A API não mantém estado em memória entre requisições. Sessões de jurado são persistidas no Supabase como hashes de tokens com expiração; sessões administrativas são assinadas e stateless. Votos e finalizações são atômicos no PostgreSQL. Os dados do arquivo JSON da versão anterior **não são importados automaticamente**. Preserve e importe manualmente qualquer dado local que precise manter.
+A API não mantém estado em memória entre requisições. Sessões de jurado são persistidas no Supabase como hashes de tokens com expiração; sessões administrativas são assinadas e stateless. PINs de jurados são mantidos como hash para autenticação e criptografados com `SESSION_SECRET` para consulta no painel. Se o segredo mudar, os PINs criptografados precisarão ser regenerados. PINs antigos, criados antes da migration de criptografia, não podem ser recuperados; use **Novo PIN** no painel para gerar outro. Votos e finalizações são atômicos no PostgreSQL. Os dados do arquivo JSON da versão anterior **não são importados automaticamente**. Preserve e importe manualmente qualquer dado local que precise manter.
 
 ## Build e testes
 

@@ -427,7 +427,7 @@ function AdminPanel() {
   const [adminToken, setAdminToken] = useState(() => sessionStorage.getItem('halloween-admin-token') ?? '');
   const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [judges, setJudges] = useState<Array<{ id: string; name: string; status: string }>>([]);
+  const [judges, setJudges] = useState<Array<{ id: string; name: string; status: string; pinCode: string | null }>>([]);
   const [ranking, setRanking] = useState<RankingRow[]>([]);
   const [summary, setSummary] = useState<{ votingStatus: VotingStatus; showQrCode: boolean; candidateCount: number; judgeCount: number; completedJudgeCount: number; voteCount: number } | null>(null);
   const [candidateForm, setCandidateForm] = useState({ intranetLogin: '', studentName: '', costumeName: '' });
@@ -441,7 +441,7 @@ function AdminPanel() {
     const [summaryData, candidateData, judgeData] = await Promise.all([
       api<{ summary: NonNullable<typeof summary>; ranking: RankingRow[] }>('/api/v1/admin/summary', { headers }),
       api<{ candidates: Candidate[] }>('/api/v1/admin/candidates', { headers }),
-      api<{ judges: Array<{ id: string; name: string; status: string }> }>('/api/v1/admin/judges', { headers }),
+      api<{ judges: Array<{ id: string; name: string; status: string; pinCode: string | null }> }>('/api/v1/admin/judges', { headers }),
     ]);
     setSummary(summaryData.summary);
     setRanking(summaryData.ranking);
@@ -526,6 +526,21 @@ function AdminPanel() {
     }
   }
 
+  async function regenerateJudgePin(judge: { id: string; name: string }) {
+    if (!window.confirm(`Gerar um novo PIN para ${judge.name}? O PIN atual será invalidado.`)) return;
+    setError('');
+    try {
+      const data = await api<{ pinCode: string }>(`/api/v1/admin/judges/${judge.id}/pin`, {
+        method: 'PATCH',
+        headers: bearer(adminToken),
+      });
+      setNewJudgePin(data.pinCode);
+      await refresh();
+    } catch (actionError) {
+      setError(formatError(actionError));
+    }
+  }
+
   async function changeVotingStatus(status: VotingStatus) {
     await perform(() => api('/api/v1/admin/voting-status', {
       method: 'PATCH',
@@ -581,7 +596,7 @@ function AdminPanel() {
         <article className="admin-card">
           <div className="card-heading"><div><p className="eyebrow">ACESSO DA BANCA</p><h2>Novo jurado</h2></div></div>
           <form className="stack-form" onSubmit={addJudge}><input aria-label="Nome do jurado" placeholder="Nome do jurado" value={judgeName} onChange={(event) => setJudgeName(event.target.value)} required maxLength={100} /><button className="button button-primary">Gerar PIN</button></form>
-          {newJudgePin && <div className="pin-reveal" role="status"><span>PIN gerado — compartilhe com o jurado</span><strong>{newJudgePin}</strong></div>}
+          {newJudgePin && <div className="pin-reveal" role="status"><span>PIN gerado ou renovado — compartilhe com o jurado</span><strong>{newJudgePin}</strong></div>}
         </article>
         <article className="admin-card ranking-card">
           <div className="card-heading"><div><p className="eyebrow">ACOMPANHAMENTO</p><h2>Ranking atual</h2></div><button className="button button-outline button-small" onClick={() => void perform(async () => {})}>Atualizar</button></div>
@@ -589,7 +604,7 @@ function AdminPanel() {
         </article>
         <article className="admin-card">
           <div className="card-heading"><div><p className="eyebrow">EQUIPE</p><h2>Jurados cadastrados</h2></div></div>
-          {judges.length === 0 ? <p className="muted">Nenhum jurado cadastrado.</p> : <ul className="judge-list">{judges.map((judge) => <li key={judge.id}><span><strong>{judge.name}</strong><small>{judge.status === 'COMPLETED' ? 'Avaliação finalizada' : 'Avaliação pendente'}</small></span><button className="icon-button" aria-label={`Excluir jurado ${judge.name}`} onClick={() => { if (window.confirm(`Excluir o jurado ${judge.name} e suas avaliações?`)) void perform(() => api(`/api/v1/admin/judges/${judge.id}`, { method: 'DELETE', headers: bearer(adminToken) })); }}>×</button></li>)}</ul>}
+          {judges.length === 0 ? <p className="muted">Nenhum jurado cadastrado.</p> : <ul className="judge-list">{judges.map((judge) => <li key={judge.id}><span className="judge-details"><strong>{judge.name}</strong><span className="judge-pin">{judge.pinCode ? `PIN: ${judge.pinCode}` : 'PIN antigo não disponível'}</span><small>{judge.status === 'COMPLETED' ? 'Avaliação finalizada' : 'Avaliação pendente'}</small></span><span className="judge-actions">{judge.status !== 'COMPLETED' && <button className="button button-outline button-small" onClick={() => void regenerateJudgePin(judge)}>Novo PIN</button>}<button className="icon-button" aria-label={`Excluir jurado ${judge.name}`} onClick={() => { if (window.confirm(`Excluir o jurado ${judge.name} e suas avaliações?`)) void perform(() => api(`/api/v1/admin/judges/${judge.id}`, { method: 'DELETE', headers: bearer(adminToken) })); }}>×</button></span></li>)}</ul>}
         </article>
       </div>
       <p className="fine-print">O ranking segue: média dos jurados, votos da plateia, criatividade e execução.</p>

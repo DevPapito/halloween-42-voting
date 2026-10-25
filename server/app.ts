@@ -176,6 +176,11 @@ app.get('/api/v1/admin/judges', requireAdmin, async (_request, response) => {
   response.json({ judges: await store.listJudges() });
 });
 
+app.patch('/api/v1/admin/judges/:judgeId/pin', requireAdmin, async (request, response) => {
+  const pinCode = await store.regenerateJudgePin(routeParameter(request, 'judgeId'));
+  response.json({ pinCode });
+});
+
 app.post('/api/v1/admin/judges', requireAdmin, async (request, response) => {
   const dto = await validateDto(CreateJudgeDto, request.body);
   response.status(201).json({ judge: await store.createJudge(dto.name) });

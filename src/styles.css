@@ -170,9 +170,11 @@ td small { margin-top: 4px; color: #85827d; font-size: 9px; }
 .icon-button:hover { border-color: #a44a38; color: #ff9278; }
 .judge-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
 .judge-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid #2d2c2a; }
-.judge-list li span { display: grid; gap: 4px; }
-.judge-list li strong { font-size: 12px; font-weight: 500; }
-.judge-list li small { color: var(--muted); font-size: 10px; }
+.judge-details { display: grid; gap: 5px; }
+.judge-details strong { font-size: 12px; font-weight: 500; }
+.judge-details small { color: var(--muted); font-size: 10px; }
+.judge-pin { color: var(--orange-light); font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .08em; }
+.judge-actions { display: flex; align-items: center; gap: 7px; }
 
 @media (max-width: 760px) {
   .app-shell { padding: 0 5%; }

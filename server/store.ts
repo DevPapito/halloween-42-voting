@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Pool, type QueryResultRow } from 'pg';
 import { HttpError } from './errors.js';
 import { sortRanking } from './ranking.js';
@@ -35,6 +35,7 @@ interface JudgeRow extends QueryResultRow {
   id: string;
   name: string;
   pin_hash?: string;
+  pin_encrypted?: string | null;
   status: 'IN_PROGRESS' | 'COMPLETED';
   created_at: Date;
 }
@@ -140,6 +141,39 @@ function pinHash(pinCode: string): string {
   return createHash('sha256').update(pinCode.trim().toUpperCase()).digest('hex');
 }
 
+function pinEncryptionKey(): Buffer {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error('SESSION_SECRET deve ter pelo menos 32 caracteres para proteger os PINs.');
+  }
+  return createHash('sha256').update(secret).digest();
+}
+
+function encryptPin(pinCode: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', pinEncryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(pinCode, 'utf8'), cipher.final()]);
+  return [iv, cipher.getAuthTag(), encrypted].map((part) => part.toString('base64url')).join('.');
+}
+
+function decryptPin(encryptedPin: string | null | undefined): string | null {
+  if (!encryptedPin) return null;
+  try {
+    const [iv, authTag, encrypted] = encryptedPin.split('.').map((part) => Buffer.from(part, 'base64url'));
+    if (!iv || !authTag || !encrypted || iv.length !== 12 || authTag.length !== 16) {
+      throw new Error('Formato de PIN criptografado inválido.');
+    }
+    const decipher = createDecipheriv('aes-256-gcm', pinEncryptionKey(), iv);
+    decipher.setAuthTag(authTag);
+    return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
+  } catch (error) {
+    console.error('Failed to decrypt judge PIN:', error);
+    throw new HttpError(500, 'Não foi possível descriptografar o PIN. Verifique o SESSION_SECRET.');
+  }
+}
+
+type AdminJudge = Omit<Judge, 'pinCode'> & { pinCode: string | null };
+
 export class VotingStore {
   async getPublicSettings(): Promise<{ votingStatus: VotingStatus; showQrCode: boolean }> {
     const rows = await query<{ voting_status: VotingStatus; show_qr_code: boolean }>(
@@ -214,15 +248,13 @@ export class VotingStore {
     if (!rows[0]) throw new HttpError(404, 'Candidato não encontrado.');
   }
 
-  async listJudges(): Promise<Array<Omit<Judge, 'pinCode'>>> {
+  async listJudges(): Promise<AdminJudge[]> {
     const rows = await query<JudgeRow>(
-      'select id, name, status, created_at from public.judges order by created_at',
+      'select id, name, pin_encrypted, status, created_at from public.judges order by created_at',
     );
-    return rows.map(({ id, name, status, created_at }) => ({
-      id,
-      name,
-      status,
-      createdAt: new Date(created_at).toISOString(),
+    return rows.map((row) => ({
+      ...judgeFromRow(row),
+      pinCode: decryptPin(row.pin_encrypted),
     }));
   }
 
@@ -233,12 +265,33 @@ export class VotingStore {
       const pinCode = randomBytes(4).toString('hex').toUpperCase();
       try {
         const rows = await query<JudgeRow>(
-          `insert into public.judges (name, pin_hash)
-           values ($1, $2)
+          `insert into public.judges (name, pin_hash, pin_encrypted)
+           values ($1, $2, $3)
            returning id, name, status, created_at`,
-          [trimmedName, pinHash(pinCode)],
+          [trimmedName, pinHash(pinCode), encryptPin(pinCode)],
         );
         return judgeFromRow(rows[0]!, pinCode);
+      } catch (error) {
+        if (error instanceof HttpError && error.status === 409 && attempt < 4) continue;
+        throw error;
+      }
+    }
+    throw new HttpError(500, 'Não foi possível gerar um PIN exclusivo. Tente novamente.');
+  }
+
+  async regenerateJudgePin(judgeId: string): Promise<string> {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const pinCode = randomBytes(4).toString('hex').toUpperCase();
+      try {
+        const rows = await query<{ id: string }>(
+          `update public.judges
+           set pin_hash = $2, pin_encrypted = $3
+           where id = $1
+           returning id`,
+          [judgeId, pinHash(pinCode), encryptPin(pinCode)],
+        );
+        if (!rows[0]) throw new HttpError(404, 'Jurado não encontrado.');
+        return pinCode;
       } catch (error) {
         if (error instanceof HttpError && error.status === 409 && attempt < 4) continue;
         throw error;
