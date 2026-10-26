@@ -52,16 +52,24 @@ function BrandHeader() {
 }
 
 function Home() {
-  const [showQrCode, setShowQrCode] = useState(false);
+  const [homeDisplay, setHomeDisplay] = useState<{
+    displayMode: 'HIDDEN' | 'QR' | 'MEDIA';
+    eventMediaType: string | null;
+    eventMediaUrl: string | null;
+  }>({ displayMode: 'HIDDEN', eventMediaType: null, eventMediaUrl: null });
   const [qrCodeError, setQrCodeError] = useState('');
 
   useEffect(() => {
     let active = true;
     async function refreshVisibility() {
       try {
-        const settings = await api<{ showQrCode: boolean }>('/api/v1/public/state');
+        const settings = await api<{
+          displayMode: 'HIDDEN' | 'QR' | 'MEDIA';
+          eventMediaType: string | null;
+          eventMediaUrl: string | null;
+        }>('/api/v1/public/state');
         if (!active) return;
-        setShowQrCode(settings.showQrCode);
+        setHomeDisplay(settings);
         setQrCodeError('');
       } catch (error: unknown) {
         if (active) setQrCodeError(formatError(error));
@@ -82,7 +90,7 @@ function Home() {
         <h1>Do terminal para o terror.<br /><span>Que comece o Halloween da 42.</span></h1>
         <p className="hero-copy">Acompanhe a votação da primeira edição do Halloween 42sp. Vote na sua fantasia favorita ou entre como jurado para avaliar cada detalhe.</p>
       </section>
-      {showQrCode && (
+      {homeDisplay.displayMode === 'QR' && (
         <section className="home-qr-section" aria-labelledby="home-qr-title">
           <p className="eyebrow">VOTAÇÃO DA PLATEIA</p>
           <h2 id="home-qr-title">Aponte a câmera e vote.</h2>
@@ -93,6 +101,17 @@ function Home() {
               level="H"
               title="QR Code para votar no concurso Halloween 42sp"
             />
+          </div>
+        </section>
+      )}
+      {homeDisplay.displayMode === 'MEDIA' && homeDisplay.eventMediaUrl && (
+        <section className="home-qr-section home-media-section" aria-label="Mídia do evento">
+          <div className="home-qr-code home-event-media">
+            {homeDisplay.eventMediaType?.startsWith('video/') ? (
+              <video src={homeDisplay.eventMediaUrl} autoPlay muted loop playsInline controls aria-label="Vídeo do evento" />
+            ) : (
+              <img src={homeDisplay.eventMediaUrl} alt="Imagem do evento Halloween 42sp" />
+            )}
           </div>
         </section>
       )}
@@ -416,12 +435,25 @@ function AdminPanel() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [judges, setJudges] = useState<Array<{ id: string; name: string; status: string; pinCode: string | null }>>([]);
   const [ranking, setRanking] = useState<RankingRow[]>([]);
-  const [summary, setSummary] = useState<{ votingStatus: VotingStatus; showQrCode: boolean; candidateCount: number; judgeCount: number; completedJudgeCount: number; voteCount: number } | null>(null);
+  const [summary, setSummary] = useState<{
+    votingStatus: VotingStatus;
+    showQrCode: boolean;
+    displayMode: 'HIDDEN' | 'QR' | 'MEDIA';
+    eventMediaPath: string | null;
+    eventMediaType: string | null;
+    candidateCount: number;
+    judgeCount: number;
+    completedJudgeCount: number;
+    voteCount: number;
+  } | null>(null);
   const [candidateForm, setCandidateForm] = useState({ intranetLogin: '', studentName: '', costumeName: '' });
   const [judgeName, setJudgeName] = useState('');
   const [newJudgePin, setNewJudgePin] = useState('');
   const [loading, setLoading] = useState(false);
+  const [mediaUploading, setMediaUploading] = useState(false);
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [error, setError] = useState('');
+  const mediaInputRef = useRef<HTMLInputElement>(null);
 
   async function refresh(token = adminToken) {
     const headers = bearer(token);
@@ -536,12 +568,49 @@ function AdminPanel() {
     }));
   }
 
-  async function changeQrCodeVisibility(visible: boolean) {
-    await perform(() => api('/api/v1/admin/qr-code', {
+  async function changeHomeDisplayMode(mode: 'HIDDEN' | 'QR' | 'MEDIA') {
+    await perform(() => api('/api/v1/admin/home-display', {
       method: 'PATCH',
       headers: bearer(adminToken),
-      body: JSON.stringify({ visible }),
+      body: JSON.stringify({ mode }),
     }));
+  }
+
+  async function uploadEventMedia(event: FormEvent) {
+    event.preventDefault();
+    if (!mediaFile) {
+      setError('Selecione uma imagem ou vídeo para enviar.');
+      return;
+    }
+    setMediaUploading(true);
+    setError('');
+    try {
+      const upload = await api<{ uploadUrl: string; objectPath: string }>('/api/v1/admin/event-media/upload-url', {
+        method: 'POST',
+        headers: bearer(adminToken),
+        body: JSON.stringify({ mediaType: mediaFile.type, fileSize: mediaFile.size }),
+      });
+      const uploadResponse = await fetch(upload.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': mediaFile.type },
+        body: mediaFile,
+      });
+      if (!uploadResponse.ok) {
+        throw new Error(`Não foi possível enviar a mídia ao Supabase Storage (${uploadResponse.status}).`);
+      }
+      await api('/api/v1/admin/event-media', {
+        method: 'POST',
+        headers: bearer(adminToken),
+        body: JSON.stringify({ objectPath: upload.objectPath }),
+      });
+      setMediaFile(null);
+      if (mediaInputRef.current) mediaInputRef.current.value = '';
+      await refresh();
+    } catch (uploadError: unknown) {
+      setError(formatError(uploadError));
+    } finally {
+      setMediaUploading(false);
+    }
   }
 
   if (!adminToken) {
@@ -567,9 +636,27 @@ function AdminPanel() {
             {(['NOT_STARTED', 'OPEN', 'CLOSED'] as VotingStatus[]).map((status) => <button key={status} className={`status-button ${summary?.votingStatus === status ? 'active' : ''}`} onClick={() => changeVotingStatus(status)}>{statusLabels[status]}</button>)}
           </div>
           <div className="qr-admin-control">
-            <div><strong>QR Code na página inicial</strong><small>{summary?.showQrCode ? 'Visível para todos que acessarem o site.' : 'Oculto da página inicial.'}</small></div>
-            <button className={`status-button ${summary?.showQrCode ? 'active' : ''}`} onClick={() => changeQrCodeVisibility(!summary?.showQrCode)} disabled={!summary}>{summary?.showQrCode ? 'Ocultar QR Code' : 'Mostrar QR Code'}</button>
+            <div><strong>Conteúdo da página inicial</strong><small>{summary?.displayMode === 'QR' ? 'QR Code visível.' : summary?.displayMode === 'MEDIA' ? `Mídia visível (${summary.eventMediaType?.startsWith('video/') ? 'vídeo' : 'imagem'}).` : 'Nenhum conteúdo adicional visível.'}</small></div>
           </div>
+          <div className="home-display-controls" aria-label="Conteúdo exibido na página inicial">
+            <button className={`status-button ${summary?.displayMode === 'QR' ? 'active' : ''}`} onClick={() => changeHomeDisplayMode('QR')} disabled={!summary}>Mostrar QR Code</button>
+            <button className={`status-button ${summary?.displayMode === 'MEDIA' ? 'active' : ''}`} onClick={() => changeHomeDisplayMode('MEDIA')} disabled={!summary || !summary.eventMediaPath}>Mostrar mídia</button>
+            <button className={`status-button ${summary?.displayMode === 'HIDDEN' ? 'active' : ''}`} onClick={() => changeHomeDisplayMode('HIDDEN')} disabled={!summary}>Ocultar</button>
+          </div>
+          <form className="event-media-upload" onSubmit={uploadEventMedia}>
+            <label htmlFor="event-media-file">Imagem ou vídeo (máximo 50 MB)</label>
+            <input
+              ref={mediaInputRef}
+              id="event-media-file"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+              onChange={(event) => setMediaFile(event.target.files?.[0] ?? null)}
+            />
+            {summary?.eventMediaType && <small>Mídia cadastrada: {summary.eventMediaType.startsWith('video/') ? 'vídeo' : 'imagem'}. O envio de outra mídia substitui a atual.</small>}
+            <button className="button button-primary button-small" disabled={!mediaFile || mediaUploading}>
+              {mediaUploading ? 'Enviando mídia...' : 'Enviar mídia'}
+            </button>
+          </form>
         </article>
         <article className="admin-card">
           <div className="card-heading"><div><p className="eyebrow">CADASTRO</p><h2>Novo candidato</h2></div></div>

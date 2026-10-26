@@ -16,6 +16,7 @@ import {
 import { VotingStore } from './store.js';
 import { validateDto } from './validation.js';
 import { createAdminSession, requireSessionConfiguration, verifyAdminSession } from './admin-session.js';
+import { createEventMediaUpload, getPublicEventMediaUrl, verifyUploadedEventMedia, isEventMediaType } from './event-media.js';
 
 const app = express();
 const store = new VotingStore();
@@ -85,7 +86,13 @@ app.get('/api/v1/health', (_request, response) => {
 
 app.get('/api/v1/public/state', async (_request, response) => {
   const settings = await store.getPublicSettings();
-  response.json({ status: settings.votingStatus, showQrCode: settings.showQrCode });
+  response.json({
+    status: settings.votingStatus,
+    showQrCode: settings.showQrCode,
+    displayMode: settings.displayMode,
+    eventMediaType: settings.eventMediaType,
+    eventMediaUrl: settings.eventMediaPath ? getPublicEventMediaUrl(settings.eventMediaPath) : null,
+  });
 });
 
 app.get('/api/v1/public/candidates', async (_request, response) => {
@@ -201,6 +208,35 @@ app.patch('/api/v1/admin/qr-code', requireAdmin, async (request, response) => {
   const dto = await validateDto(UpdateQrCodeVisibilityDto, request.body);
   await store.setQrCodeVisibility(dto.visible);
   response.json({ showQrCode: dto.visible });
+});
+
+app.patch('/api/v1/admin/home-display', requireAdmin, async (request, response) => {
+  const mode = request.body?.mode;
+  if (mode !== 'HIDDEN' && mode !== 'QR' && mode !== 'MEDIA') {
+    throw new HttpError(400, 'Modo de exibição inválido.');
+  }
+  if (mode === 'MEDIA' && !(await store.getPublicSettings()).eventMediaPath) {
+    throw new HttpError(409, 'Envie uma imagem ou vídeo antes de exibi-lo na página inicial.');
+  }
+  await store.setHomeDisplayMode(mode);
+  response.json({ displayMode: mode });
+});
+
+app.post('/api/v1/admin/event-media/upload-url', requireAdmin, async (request, response) => {
+  const mediaType = request.body?.mediaType;
+  const fileSize = request.body?.fileSize;
+  if (!isEventMediaType(mediaType)) throw new HttpError(400, 'Formato de arquivo não suportado.');
+  if (typeof fileSize !== 'number') throw new HttpError(400, 'Tamanho do arquivo inválido.');
+  response.json(await createEventMediaUpload(mediaType, fileSize));
+});
+
+app.post('/api/v1/admin/event-media', requireAdmin, async (request, response) => {
+  const media = await verifyUploadedEventMedia(request.body?.objectPath);
+  await store.setEventMedia(media.mediaPath, media.mediaType);
+  response.json({
+    eventMediaType: media.mediaType,
+    eventMediaUrl: getPublicEventMediaUrl(media.mediaPath),
+  });
 });
 
 app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {

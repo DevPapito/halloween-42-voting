@@ -7,6 +7,8 @@ import type {
   Evaluation,
   EvaluationScores,
   Judge,
+  EventMediaType,
+  HomeDisplayMode,
   RankingRow,
   VotingStatus,
 } from './types.js';
@@ -175,12 +177,29 @@ function decryptPin(encryptedPin: string | null | undefined): string | null {
 type AdminJudge = Omit<Judge, 'pinCode'> & { pinCode: string | null };
 
 export class VotingStore {
-  async getPublicSettings(): Promise<{ votingStatus: VotingStatus; showQrCode: boolean }> {
-    const rows = await query<{ voting_status: VotingStatus; show_qr_code: boolean }>(
-      'select voting_status, show_qr_code from public.global_settings where id = 1',
+  async getPublicSettings(): Promise<{
+    votingStatus: VotingStatus;
+    displayMode: HomeDisplayMode;
+    showQrCode: boolean;
+    eventMediaPath: string | null;
+    eventMediaType: EventMediaType | null;
+  }> {
+    const rows = await query<{
+      voting_status: VotingStatus;
+      home_display_mode: HomeDisplayMode;
+      event_media_path: string | null;
+      event_media_type: EventMediaType | null;
+    }>(
+      'select voting_status, home_display_mode, event_media_path, event_media_type from public.global_settings where id = 1',
     );
     if (!rows[0]) throw new HttpError(500, 'A configuração global do evento não foi encontrada.');
-    return { votingStatus: rows[0].voting_status, showQrCode: rows[0].show_qr_code };
+    return {
+      votingStatus: rows[0].voting_status,
+      displayMode: rows[0].home_display_mode,
+      showQrCode: rows[0].home_display_mode === 'QR',
+      eventMediaPath: rows[0].event_media_path,
+      eventMediaType: rows[0].event_media_type,
+    };
   }
 
   async getStatus(): Promise<VotingStatus> {
@@ -202,10 +221,34 @@ export class VotingStore {
 
   async setQrCodeVisibility(visible: boolean): Promise<void> {
     await query(
-      `insert into public.global_settings (id, show_qr_code)
-       values (1, $1)
-       on conflict (id) do update set show_qr_code = excluded.show_qr_code`,
-      [visible],
+      `insert into public.global_settings (id, show_qr_code, home_display_mode)
+       values (1, $1, $2)
+       on conflict (id) do update set
+         show_qr_code = excluded.show_qr_code,
+         home_display_mode = excluded.home_display_mode`,
+      [visible, visible ? 'QR' : 'HIDDEN'],
+    );
+  }
+
+  async setHomeDisplayMode(mode: HomeDisplayMode): Promise<void> {
+    await query(
+      `insert into public.global_settings (id, show_qr_code, home_display_mode)
+       values (1, $1, $2)
+       on conflict (id) do update set
+         show_qr_code = excluded.show_qr_code,
+         home_display_mode = excluded.home_display_mode`,
+      [mode === 'QR', mode],
+    );
+  }
+
+  async setEventMedia(mediaPath: string, mediaType: EventMediaType): Promise<void> {
+    await query(
+      `insert into public.global_settings (id, event_media_path, event_media_type)
+       values (1, $1, $2)
+       on conflict (id) do update set
+         event_media_path = excluded.event_media_path,
+         event_media_type = excluded.event_media_type`,
+      [mediaPath, mediaType],
     );
   }
 
@@ -454,6 +497,9 @@ export class VotingStore {
       vote_count: string;
       voting_status: VotingStatus;
       show_qr_code: boolean;
+      home_display_mode: HomeDisplayMode;
+      event_media_path: string | null;
+      event_media_type: EventMediaType | null;
     }>(
       `select
          (select count(*) from public.candidates) as candidate_count,
@@ -461,13 +507,19 @@ export class VotingStore {
          (select count(*) from public.judges where status = 'COMPLETED') as completed_judge_count,
          (select count(*) from public.votes) as vote_count,
          (select voting_status from public.global_settings where id = 1) as voting_status,
-         (select show_qr_code from public.global_settings where id = 1) as show_qr_code`,
+         (select show_qr_code from public.global_settings where id = 1) as show_qr_code,
+         (select home_display_mode from public.global_settings where id = 1) as home_display_mode,
+         (select event_media_path from public.global_settings where id = 1) as event_media_path,
+         (select event_media_type from public.global_settings where id = 1) as event_media_type`,
     );
     const row = rows[0];
     if (!row) throw new HttpError(500, 'Não foi possível carregar o resumo do evento.');
     return {
       votingStatus: row.voting_status,
-      showQrCode: row.show_qr_code,
+      showQrCode: row.home_display_mode === 'QR',
+      displayMode: row.home_display_mode,
+      eventMediaPath: row.event_media_path,
+      eventMediaType: row.event_media_type,
       candidateCount: Number(row.candidate_count),
       judgeCount: Number(row.judge_count),
       completedJudgeCount: Number(row.completed_judge_count),

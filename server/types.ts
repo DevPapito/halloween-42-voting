@@ -1,5 +1,7 @@
 export type VotingStatus = 'NOT_STARTED' | 'OPEN' | 'CLOSED';
 export type JudgeStatus = 'IN_PROGRESS' | 'COMPLETED';
+export type HomeDisplayMode = 'HIDDEN' | 'QR' | 'MEDIA';
+export type EventMediaType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif' | 'video/mp4' | 'video/webm' | 'video/quicktime';
 
 export interface Candidate {
   id: string;
