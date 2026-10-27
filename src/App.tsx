@@ -105,7 +105,10 @@ function Home() {
         </section>
       )}
       {homeDisplay.displayMode === 'MEDIA' && homeDisplay.eventMediaUrl && (
-        <section className="home-qr-section home-media-section" aria-label="Mídia do evento">
+        <section
+          className={`home-qr-section home-media-section ${homeDisplay.eventMediaType?.startsWith('video/') ? 'home-video-section' : ''}`}
+          aria-label="Mídia do evento"
+        >
           <div className="home-qr-code home-event-media">
             {homeDisplay.eventMediaType?.startsWith('video/') ? (
               <video src={homeDisplay.eventMediaUrl} autoPlay muted loop playsInline controls aria-label="Vídeo do evento" />
