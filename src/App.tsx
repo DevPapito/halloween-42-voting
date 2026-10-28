@@ -42,7 +42,7 @@ function BrandHeader() {
     <header className="topbar">
       <a className="brand" href="/" aria-label="Halloween 42sp - início">
         <span className="brand-mark">42</span>
-        <span>HALLOWEN <strong>42SP</strong> <span className="brand-edition">1ª EDITION</span></span>
+        <span>HALLOWEN <strong>42SP</strong> <span className="brand-edition">1ª EDIÇÃO</span></span>
       </a>
       <nav aria-label="Navegação principal">
         <a href="/jurado/avaliar">Jurado</a>
