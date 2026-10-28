@@ -185,6 +185,12 @@ td { padding: 12px 10px; border-bottom: 1px solid #2b2a28; color: #c8c5c0; font-
 td strong, td small { display: block; }
 td strong { color: #efede8; font-weight: 500; }
 td small { margin-top: 4px; color: #85827d; font-size: 9px; }
+.actions-cell { display: flex; align-items: center; gap: 7px; }
+.ranking-notes-row > td { padding: 14px; white-space: normal; background: #171716; }
+.ranking-notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.ranking-note { padding: 12px; border: 1px solid var(--line); background: var(--panel); }
+.ranking-note strong { color: var(--orange-light); font-size: 11px; font-weight: 500; }
+.ranking-note p { margin: 7px 0 0; color: #c8c5c0; font-size: 11px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .rank-cell { color: var(--orange); font-family: 'DM Mono', monospace; }
 .icon-button { width: 28px; height: 28px; border: 1px solid #393835; background: transparent; color: #aaa6a1; cursor: pointer; font-size: 18px; line-height: 1; }
 .icon-button:hover { border-color: #a44a38; color: #ff9278; }

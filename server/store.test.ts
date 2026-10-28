@@ -20,6 +20,7 @@ function rankingRow(
     executionAverage: 0,
     publicVotesCount: 0,
     evaluationsCount: 0,
+    judgeNotes: [],
     ...overrides,
   };
 }

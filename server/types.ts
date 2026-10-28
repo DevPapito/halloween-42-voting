@@ -68,4 +68,5 @@ export interface RankingRow {
   executionAverage: number;
   publicVotesCount: number;
   evaluationsCount: number;
+  judgeNotes: Array<{ judgeName: string; notes: string }>;
 }

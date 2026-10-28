@@ -445,8 +445,11 @@ export class VotingStore {
       query<CandidateRow>(
         'select id, intranet_login, student_name, costume_name, created_at from public.candidates',
       ),
-      query<EvaluationRow>(
-        'select candidate_id, creativity_score, execution_score, total_score from public.evaluations',
+      query<EvaluationRow & { judge_name: string }>(
+        `select e.candidate_id, e.creativity_score, e.execution_score, e.total_score,
+                e.notes, j.name as judge_name
+         from public.evaluations e
+         join public.judges j on j.id = e.judge_id`,
       ),
       query<{ candidate_id: string }>('select candidate_id from public.votes'),
     ]);
@@ -455,6 +458,7 @@ export class VotingStore {
       string,
       Array<{ creativity: number; execution: number; total: number }>
     >();
+    const notesByCandidate = new Map<string, Array<{ judgeName: string; notes: string }>>();
     for (const evaluation of evaluationRows) {
       const current = evaluationsByCandidate.get(evaluation.candidate_id) ?? [];
       current.push({
@@ -463,6 +467,11 @@ export class VotingStore {
         total: Number(evaluation.total_score),
       });
       evaluationsByCandidate.set(evaluation.candidate_id, current);
+      if (evaluation.notes?.trim()) {
+        const candidateNotes = notesByCandidate.get(evaluation.candidate_id) ?? [];
+        candidateNotes.push({ judgeName: evaluation.judge_name, notes: evaluation.notes });
+        notesByCandidate.set(evaluation.candidate_id, candidateNotes);
+      }
     }
     const votesByCandidate = new Map<string, number>();
     for (const vote of voteRows) {
@@ -484,6 +493,7 @@ export class VotingStore {
         executionAverage: average((item) => item.execution),
         publicVotesCount: votesByCandidate.get(candidate.id) ?? 0,
         evaluationsCount: evaluations.length,
+        judgeNotes: notesByCandidate.get(candidate.id) ?? [],
       };
     });
     return sortRanking(rows);

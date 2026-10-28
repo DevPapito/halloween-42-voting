@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api, ApiError, bearer } from './api';
 import type { Candidate, Evaluation, EvaluationDraft, RankingRow, VotingStatus } from './types';
@@ -440,6 +440,7 @@ function AdminPanel() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [judges, setJudges] = useState<Array<{ id: string; name: string; status: string; pinCode: string | null }>>([]);
   const [ranking, setRanking] = useState<RankingRow[]>([]);
+  const [expandedNotesCandidateId, setExpandedNotesCandidateId] = useState<string | null>(null);
   const [summary, setSummary] = useState<{
     votingStatus: VotingStatus;
     showQrCode: boolean;
@@ -679,7 +680,46 @@ function AdminPanel() {
         </article>
         <article className="admin-card ranking-card">
           <div className="card-heading"><div><p className="eyebrow">ACOMPANHAMENTO</p><h2>Ranking atual</h2></div><button className="button button-outline button-small" onClick={() => void perform(async () => {})}>Atualizar</button></div>
-          {ranking.length === 0 ? <p className="muted">Cadastre candidatos para ver o ranking.</p> : <div className="table-wrap"><table><thead><tr><th>#</th><th>Fantasia</th><th>Júri</th><th>Votos</th><th>Ações</th></tr></thead><tbody>{ranking.map((row, index) => <tr key={row.candidateId}><td className="rank-cell">{String(index + 1).padStart(2, '0')}</td><td><strong>{row.costumeName}</strong><small>{row.studentName}</small></td><td>{row.juryAverage.toFixed(2)}</td><td>{row.publicVotesCount}</td><td className="actions-cell"><button className="icon-button" aria-label={`Editar ${row.costumeName}`} onClick={() => { const candidate = candidates.find((entry) => entry.id === row.candidateId); if (!candidate) return; const studentName = window.prompt('Nome do participante', candidate.studentName); if (studentName === null) return; const costumeName = window.prompt('Nome da fantasia', candidate.costumeName); if (costumeName === null) return; const intranetLogin = window.prompt('Login da Intranet', candidate.intranetLogin); if (intranetLogin === null) return; void perform(() => api(`/api/v1/admin/candidates/${row.candidateId}`, { method: 'PATCH', headers: bearer(adminToken), body: JSON.stringify({ intranetLogin, studentName, costumeName }) })); }}>✎</button><button className="icon-button" aria-label={`Excluir ${row.costumeName}`} onClick={() => { if (window.confirm(`Excluir ${row.costumeName}? Os votos e notas associados também serão removidos.`)) void perform(() => api(`/api/v1/admin/candidates/${row.candidateId}`, { method: 'DELETE', headers: bearer(adminToken) })); }}>×</button></td></tr>)}</tbody></table></div>}
+          {ranking.length === 0 ? <p className="muted">Cadastre candidatos para ver o ranking.</p> : <div className="table-wrap"><table><thead><tr><th>#</th><th>Fantasia</th><th>Júri</th><th>Votos</th><th>Ações</th></tr></thead><tbody>{ranking.map((row, index) => (
+            <Fragment key={row.candidateId}>
+              <tr>
+                <td className="rank-cell">{String(index + 1).padStart(2, '0')}</td>
+                <td><strong>{row.costumeName}</strong><small>{row.studentName}</small></td>
+                <td>{row.juryAverage.toFixed(2)}</td>
+                <td>{row.publicVotesCount}</td>
+                <td className="actions-cell">
+                  {row.judgeNotes.length > 0 && (
+                    <button
+                      className="button button-outline button-small"
+                      aria-expanded={expandedNotesCandidateId === row.candidateId}
+                      aria-controls={`judge-notes-${row.candidateId}`}
+                      onClick={() => setExpandedNotesCandidateId(
+                        expandedNotesCandidateId === row.candidateId ? null : row.candidateId,
+                      )}
+                    >
+                      {expandedNotesCandidateId === row.candidateId ? 'Ocultar observações' : `Observações (${row.judgeNotes.length})`}
+                    </button>
+                  )}
+                  <button className="icon-button" aria-label={`Editar ${row.costumeName}`} onClick={() => { const candidate = candidates.find((entry) => entry.id === row.candidateId); if (!candidate) return; const studentName = window.prompt('Nome do participante', candidate.studentName); if (studentName === null) return; const costumeName = window.prompt('Nome da fantasia', candidate.costumeName); if (costumeName === null) return; const intranetLogin = window.prompt('Login da Intranet', candidate.intranetLogin); if (intranetLogin === null) return; void perform(() => api(`/api/v1/admin/candidates/${row.candidateId}`, { method: 'PATCH', headers: bearer(adminToken), body: JSON.stringify({ intranetLogin, studentName, costumeName }) })); }}>✎</button>
+                  <button className="icon-button" aria-label={`Excluir ${row.costumeName}`} onClick={() => { if (window.confirm(`Excluir ${row.costumeName}? Os votos e notas associados também serão removidos.`)) void perform(() => api(`/api/v1/admin/candidates/${row.candidateId}`, { method: 'DELETE', headers: bearer(adminToken) })); }}>×</button>
+                </td>
+              </tr>
+              {expandedNotesCandidateId === row.candidateId && row.judgeNotes.length > 0 && (
+                <tr className="ranking-notes-row">
+                  <td colSpan={5}>
+                    <div className="ranking-notes" id={`judge-notes-${row.candidateId}`}>
+                      {row.judgeNotes.map(({ judgeName, notes }) => (
+                        <article className="ranking-note" key={judgeName}>
+                          <strong>{judgeName}</strong>
+                          <p>{notes}</p>
+                        </article>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </Fragment>
+          ))}</tbody></table></div>}
         </article>
         <article className="admin-card">
           <div className="card-heading"><div><p className="eyebrow">EQUIPE</p><h2>Jurados cadastrados</h2></div></div>
