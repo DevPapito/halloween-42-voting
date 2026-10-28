@@ -42,7 +42,7 @@ function BrandHeader() {
     <header className="topbar">
       <a className="brand" href="/" aria-label="Halloween 42sp - início">
         <span className="brand-mark">42</span>
-        <span>HALLOWEEN <strong>VOTING</strong> <span className="brand-edition">1ª EDITION</span></span>
+        <span>HALLOWEN <strong>42SP</strong> <span className="brand-edition">1ª EDITION</span></span>
       </a>
       <nav aria-label="Navegação principal">
         <a href="/jurado/avaliar">Jurado</a>
@@ -86,13 +86,15 @@ function Home() {
   return (
     <>
       <section className="hero">
-        <p className="eyebrow">42sp · CONCURSO DE FANTASIAS</p>
-        <h1>Do terminal para o terror.<br /><span>Que comece o Halloween da 42.</span></h1>
-        <p className="hero-copy">Acompanhe a votação da primeira edição do Halloween 42sp. Vote na sua fantasia favorita ou entre como jurado para avaliar cada detalhe.</p>
+        <h1>Do terminal para o caixão,<br /><span>mas calma: é só fantasia, não é demissão!</span></h1>
+        <p className="hero-copy">
+          {homeDisplay.displayMode === 'MEDIA' && homeDisplay.eventMediaType?.startsWith('image/')
+            ? 'Prepare os doces e os sustos: vem aí o desfile de cosplay de Halloween da 42sp, com a participação do nosso mascote assustadoramente fofinho!'
+            : 'Acompanhe a votação da primeira edição do Halloween 42sp. Vote na sua fantasia favorita ou entre como jurado para avaliar cada detalhe.'}
+        </p>
       </section>
       {homeDisplay.displayMode === 'QR' && (
-        <section className="home-qr-section" aria-labelledby="home-qr-title">
-          <p className="eyebrow">VOTAÇÃO DA PLATEIA</p>
+        <section className="home-qr-section home-qr-transparent" aria-labelledby="home-qr-title">
           <h2 id="home-qr-title">Aponte a câmera e vote.</h2>
           <div className="home-qr-code">
             <QRCodeSVG
@@ -695,7 +697,6 @@ export function App() {
     <div className="app-shell">
       <BrandHeader />
       <main>{path === '/votar' ? <PublicVote /> : path === '/jurado/avaliar' ? <JudgeEvaluation /> : path === '/admin' ? <AdminPanel /> : <Home />}</main>
-      <footer className="footer"><span>42sp HALLOWEEN VOTING <span className="brand-edition">1ª EDITION</span></span><span>FEITO PARA UMA NOITE ASSUSTADORAMENTE BOA.</span></footer>
     </div>
   );
 }
